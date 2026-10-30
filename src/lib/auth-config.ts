@@ -1,11 +1,9 @@
 import { isIP } from 'node:net';
 
-export const DEFAULT_AUTH_DATABASE_PATH = '.data/auth.sqlite';
-
 export type AuthConfiguration = Readonly<{
   baseURL: string;
   secret: string;
-  databasePath: string;
+  databaseURL: string;
 }>;
 
 function configuredOrigin(value: string | undefined): string | null {
@@ -41,21 +39,27 @@ export function readAuthConfiguration(
 ): AuthConfiguration | null {
   const baseURL = configuredOrigin(environment.BETTER_AUTH_URL);
   const secret = environment.BETTER_AUTH_SECRET;
-  const configuredDatabasePath = environment.BETTER_AUTH_DATABASE_PATH;
+  const databaseURL = environment.DATABASE_URL?.trim();
+  try {
+    const url = new URL(databaseURL ?? '');
+    if (
+      !['postgres:', 'postgresql:'].includes(url.protocol) ||
+      !url.hostname ||
+      !url.username ||
+      url.hash
+    )
+      return null;
+  } catch {
+    return null;
+  }
 
-  if (
-    !baseURL ||
-    !secret ||
-    secret.length < 32 ||
-    (configuredDatabasePath !== undefined &&
-      (!configuredDatabasePath.trim() || configuredDatabasePath.includes('\0')))
-  ) {
+  if (!baseURL || !secret || secret.length < 32 || !databaseURL) {
     return null;
   }
 
   return {
     baseURL,
     secret,
-    databasePath: configuredDatabasePath?.trim() ?? DEFAULT_AUTH_DATABASE_PATH,
+    databaseURL,
   };
 }

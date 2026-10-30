@@ -109,9 +109,9 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  let slot: ReturnType<typeof reserveRequestSlot>;
+  let slot: Awaited<ReturnType<typeof reserveRequestSlot>>;
   try {
-    slot = reserveRequestSlot(user.id, 'ai');
+    slot = await reserveRequestSlot(user.id, 'ai');
   } catch {
     return jsonError(
       503,

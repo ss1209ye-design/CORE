@@ -1,52 +1,62 @@
 import assert from 'node:assert/strict';
-import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
+import { loadEnvConfig } from '@next/env';
+import { Pool, type PoolClient } from 'pg';
+import { createDatabaseConnectionConfig } from '../src/lib/database-tls';
 import { consumeFeatureSlot } from '../src/lib/feature-rate-store';
-function database() {
-  const db = new DatabaseSync(':memory:');
-  db.exec(
-    'CREATE TABLE rateLimit (id TEXT PRIMARY KEY, key TEXT, count INTEGER, lastRequest INTEGER)',
+
+async function isolated(run: (client: PoolClient) => Promise<void>) {
+  loadEnvConfig(process.cwd());
+  assert.ok(process.env.DATABASE_URL, 'PostgreSQL test requires DATABASE_URL');
+  const pool = new Pool(
+    createDatabaseConnectionConfig(process.env.DATABASE_URL),
   );
-  return db;
-}
-test('AI 제한은 사용자별 5회이며 거절 요청은 창을 연장하지 않는다', () => {
-  const db = database();
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
+    await client.query(
+      'CREATE TEMP TABLE "rateLimit" (id text PRIMARY KEY, key text UNIQUE, count integer, "lastRequest" bigint) ON COMMIT DROP',
+    );
+    await client.query('SET LOCAL search_path TO pg_temp');
+    await run(client);
+  } finally {
+    await client.query('ROLLBACK');
+    client.release();
+    await pool.end();
+  }
+}
+test('PostgreSQL 요청 제한은 계정별로 분리하고 시간 경계에서 다시 허용한다', async () => {
+  await isolated(async (client) => {
     for (let i = 0; i < 5; i++)
       assert.equal(
-        consumeFeatureSlot(db, 'synthetic-a', 'ai', 1000 + i * 1000).allowed,
+        (await consumeFeatureSlot(client, 'a', 'ai', 1000 + i * 1000)).allowed,
         true,
       );
-    assert.deepEqual(consumeFeatureSlot(db, 'synthetic-a', 'ai', 6000), {
+    assert.deepEqual(await consumeFeatureSlot(client, 'a', 'ai', 6000), {
       allowed: false,
       retryAfter: 55,
     });
     assert.equal(
-      consumeFeatureSlot(db, 'synthetic-b', 'ai', 6000).allowed,
+      (await consumeFeatureSlot(client, 'b', 'ai', 6000)).allowed,
       true,
     );
     assert.equal(
-      consumeFeatureSlot(db, 'synthetic-a', 'ai', 61000).allowed,
+      (await consumeFeatureSlot(client, 'a', 'ai', 61000)).allowed,
       true,
     );
-  } finally {
-    db.close();
-  }
+  });
 });
-test('URL 수집과 AI 한도는 분리되고 URL은 10회 제한이다', () => {
-  const db = database();
-  try {
-    for (let i = 0; i < 10; i++)
-      assert.equal(
-        consumeFeatureSlot(db, 'synthetic', 'import', 1000).allowed,
-        true,
-      );
-    assert.equal(
-      consumeFeatureSlot(db, 'synthetic', 'import', 1000).allowed,
-      false,
+test('요청 종류별 한도를 분리하고 몰린 요청도 한도를 넘지 않는다', async () => {
+  await isolated(async (client) => {
+    const results = await Promise.all(
+      Array.from({ length: 20 }, () =>
+        consumeFeatureSlot(client, 'a', 'import', 1000),
+      ),
     );
-    assert.equal(consumeFeatureSlot(db, 'synthetic', 'ai', 1000).allowed, true);
-  } finally {
-    db.close();
-  }
+    assert.equal(results.filter((r) => r.allowed).length, 10);
+    assert.equal(
+      (await consumeFeatureSlot(client, 'a', 'ai', 1000)).allowed,
+      true,
+    );
+  });
 });

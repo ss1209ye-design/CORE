@@ -3,13 +3,13 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
-import { getLocalAuth } from '@/lib/auth-core';
+import { getAuth } from '@/lib/auth-core';
 import { getAuthenticatedUser } from '@/lib/auth-server';
 
 export async function completeGuideAction() {
   if (!(await getAuthenticatedUser()))
     throw new Error('Authentication required');
-  await getLocalAuth().api.updateUser({
+  await getAuth().api.updateUser({
     headers: await headers(),
     body: { guideCompleted: true },
   });
@@ -17,7 +17,7 @@ export async function completeGuideAction() {
 }
 
 export async function signOutAction() {
-  await getLocalAuth().api.signOut({ headers: await headers() });
+  await getAuth().api.signOut({ headers: await headers() });
   revalidatePath('/', 'layout');
   redirect('/welcome');
 }

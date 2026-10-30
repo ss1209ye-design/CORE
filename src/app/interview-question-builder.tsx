@@ -55,7 +55,7 @@ export default function InterviewQuestionBuilder({
   jobs: AIJob[];
   experiences: AIExperience[];
   sessions: InterviewSession[];
-  onSave: (session: InterviewSession) => boolean;
+  onSave: (session: InterviewSession) => Promise<boolean>;
   onDirtyChange: (dirty: boolean) => void;
   legacyQuestions: LegacyQuestion[];
 }) {
@@ -105,7 +105,7 @@ export default function InterviewQuestionBuilder({
     setDirty(value);
     onDirtyChange(value);
   }
-  function save(next = active) {
+  async function save(next = active) {
     if (!next) return false;
     const title = interviewSessionTitleSchema.safeParse(next.title);
     if (!title.success) {
@@ -119,7 +119,7 @@ export default function InterviewQuestionBuilder({
       title: title.data,
       hospitalName: (next.hospitalName ?? '').trim(),
     };
-    if (!onSave(normalized)) {
+    if (!(await onSave(normalized))) {
       setLocal(normalized);
       markDirty(true);
       setMessage(
@@ -231,7 +231,7 @@ export default function InterviewQuestionBuilder({
       setNewTitle('');
       setNewHospitalName('');
       setLocal(session);
-      save(session);
+      await save(session);
     } catch (error) {
       if (!controller.signal.aborted)
         setMessage(
@@ -256,7 +256,7 @@ export default function InterviewQuestionBuilder({
       setMessage('피드백 보관 한도에 도달했습니다. 새 연습을 시작해 주세요.');
       return;
     }
-    if (!save(active)) return;
+    if (!(await save(active))) return;
     const source = active;
     const answer = question.answer;
     const questionId = question.id;
@@ -286,7 +286,7 @@ export default function InterviewQuestionBuilder({
         response.result,
       );
       setLocal(next);
-      save(next);
+      await save(next);
     } catch (error) {
       if (!controller.signal.aborted)
         setMessage(
@@ -707,7 +707,7 @@ export default function InterviewQuestionBuilder({
                   type="button"
                   className="button secondary"
                   disabled={busy}
-                  onClick={() => save()}
+                  onClick={async () => await save()}
                 >
                   답변 저장
                 </button>
@@ -799,7 +799,7 @@ export default function InterviewQuestionBuilder({
               type="button"
               className="button secondary"
               disabled={busy}
-              onClick={() => save()}
+              onClick={async () => await save()}
             >
               전체 기록 저장
             </button>
@@ -807,8 +807,8 @@ export default function InterviewQuestionBuilder({
               type="button"
               className="button"
               disabled={busy}
-              onClick={() =>
-                save({ ...active, completedAt: new Date().toISOString() })
+              onClick={async () =>
+                await save({ ...active, completedAt: new Date().toISOString() })
               }
             >
               연습 종료·저장

@@ -10,6 +10,7 @@ import {
 } from '../src/lib/auth-username';
 
 const configuration = {
+  DATABASE_URL: 'postgresql://test:synthetic@db.example.com:6543/postgres',
   BETTER_AUTH_URL: 'http://localhost:3000',
   BETTER_AUTH_SECRET: 'test-only-secret-not-for-real-accounts-12345',
 };
@@ -56,22 +57,24 @@ test('HTTPS 서비스와 로컬 서버 원점을 정확히 구분한다', () => 
     );
 });
 
-test('설정된 계정 DB 경로를 보존하고 빈 경로·널 바이트를 거절한다', () => {
-  assert.equal(
-    readAuthConfiguration({
-      ...configuration,
-      BETTER_AUTH_DATABASE_PATH: '.data/test.sqlite',
-    })?.databasePath,
-    '.data/test.sqlite',
-  );
-  for (const path of ['', ' ', 'invalid\0.sqlite'])
+test('PostgreSQL 주소가 없거나 잘못되면 인증을 거절한다', () => {
+  for (const value of [
+    undefined,
+    '',
+    ' ',
+    'file:auth.sqlite',
+    'https://db.example.com',
+    'postgresql://',
+  ]) {
     assert.equal(
-      readAuthConfiguration({
-        ...configuration,
-        BETTER_AUTH_DATABASE_PATH: path,
-      }),
+      readAuthConfiguration({ ...configuration, DATABASE_URL: value }),
       null,
     );
+  }
+  assert.equal(
+    readAuthConfiguration(configuration)?.databaseURL,
+    configuration.DATABASE_URL,
+  );
 });
 
 test('아이디는 ASCII 영문자·숫자·밑줄만 허용하고 양쪽 길이 경계를 포함한다', () => {

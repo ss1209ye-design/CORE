@@ -1,254 +1,170 @@
-import { randomBytes } from 'node:crypto';
-import {
-  appendFile,
-  chmod,
-  lstat,
-  mkdir,
-  open,
-  readFile,
-  writeFile,
-} from 'node:fs/promises';
-import { join, resolve } from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
+import { mkdir, chmod } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { DatabaseSync, backup } from 'node:sqlite';
 import { loadEnvConfig } from '@next/env';
-import { parse } from 'dotenv';
+import { Pool } from 'pg';
 import { getMigrations } from 'better-auth/db/migration';
-import {
-  DEFAULT_AUTH_DATABASE_PATH,
-  readAuthConfiguration,
-} from '../src/lib/auth-config';
-import { getLocalAuth } from '../src/lib/auth-core';
+import { createAuth } from '../src/lib/auth-core';
+import { readAuthConfiguration } from '../src/lib/auth-config';
+import { createDatabaseConnectionConfig } from '../src/lib/database-tls';
 
-const authEnvironmentKeys = [
-  'BETTER_AUTH_URL',
-  'BETTER_AUTH_SECRET',
-  'BETTER_AUTH_DATABASE_PATH',
+const tables = [
+  'user',
+  'account',
+  'session',
+  'verification',
+  'rateLimit',
 ] as const;
+const quote = (name: string) => '"' + name.replaceAll('"', '""') + '"';
 
-type AuthEnvironment = Readonly<Record<string, string | undefined>>;
-
-function hasAuthConfiguration(environment: AuthEnvironment): boolean {
-  return authEnvironmentKeys.some((key) => environment[key] !== undefined);
-}
-
-function requireCompleteCredentials(
-  environment: AuthEnvironment,
-  source: string,
-): void {
-  const hasURL = environment.BETTER_AUTH_URL !== undefined;
-  const hasSecret = environment.BETTER_AUTH_SECRET !== undefined;
-
-  if (hasAuthConfiguration(environment) && (!hasURL || !hasSecret)) {
-    throw new Error(
-      `Incomplete Better Auth settings in ${source}; no existing values were changed.`,
-    );
-  }
-}
-
-async function readExistingEnvironmentFile(
-  projectRoot: string,
-): Promise<{ environmentPath: string; existingContents: string | null }> {
-  loadEnvConfig(projectRoot, true);
-
-  const environmentPath = join(projectRoot, '.env.local');
-  let existingContents: string | null;
-  try {
-    const status = await lstat(environmentPath);
-    if (!status.isFile()) {
-      throw new Error(
-        '.env.local must be a regular file; no values were changed.',
-      );
-    }
-    existingContents = await readFile(environmentPath, 'utf8');
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-    existingContents = null;
-  }
-
-  const localEnvironment =
-    existingContents === null ? {} : parse(existingContents);
-  requireCompleteCredentials(localEnvironment as AuthEnvironment, '.env.local');
-  requireCompleteCredentials(process.env, 'the loaded environment');
-
-  return { environmentPath, existingContents };
-}
-
-async function ensureEnvironmentFile(projectRoot: string): Promise<void> {
-  const { environmentPath, existingContents } =
-    await readExistingEnvironmentFile(projectRoot);
-
-  if (!hasAuthConfiguration(process.env)) {
-    const secret = randomBytes(32).toString('base64url');
-    const contents = [
-      'BETTER_AUTH_URL=http://localhost:3000',
-      `BETTER_AUTH_SECRET=${secret}`,
-      `BETTER_AUTH_DATABASE_PATH=${DEFAULT_AUTH_DATABASE_PATH}`,
-      '',
-    ].join('\n');
-
-    if (existingContents === null) {
-      await writeFile(environmentPath, contents, {
-        encoding: 'utf8',
-        flag: 'wx',
-        mode: 0o600,
-      });
-    } else {
-      const separator = existingContents.endsWith('\n') ? '' : '\n';
-      await appendFile(environmentPath, `${separator}${contents}`, 'utf8');
-    }
-
-    await chmod(environmentPath, 0o600);
-    loadEnvConfig(projectRoot, true, undefined, true);
-  } else if (existingContents !== null) {
-    await chmod(environmentPath, 0o600);
-  }
-
-  if (!readAuthConfiguration()) {
-    throw new Error(
-      'Better Auth settings are missing or invalid; no database changes were made.',
-    );
-  }
-}
-
-async function ensureDatabaseFile(databasePath: string): Promise<void> {
-  try {
-    const status = await lstat(databasePath);
-    if (!status.isFile()) {
-      throw new Error(
-        'The configured authentication database path is not a regular file.',
-      );
-    }
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-
-    const file = await open(databasePath, 'wx', 0o600);
-    await file.close();
-  }
-
-  const status = await lstat(databasePath);
-  if (!status.isFile()) {
-    throw new Error(
-      'The configured authentication database path is not a regular file.',
-    );
-  }
-  await chmod(databasePath, 0o600);
-}
-
-async function previewAuthentication(projectRoot: string): Promise<void> {
-  await readExistingEnvironmentFile(projectRoot);
-
+async function main() {
+  loadEnvConfig(process.cwd());
   const configuration = readAuthConfiguration();
-  if (!configuration) {
-    throw new Error(
-      'Better Auth settings are missing or invalid; preview does not create or change files.',
-    );
-  }
-
-  const databasePath = resolve(projectRoot, configuration.databasePath);
-  let databaseStatus: Awaited<ReturnType<typeof lstat>>;
+  if (!configuration || !process.env.DIRECT_URL)
+    throw new Error('Missing configuration');
+  const pool = new Pool(createDatabaseConnectionConfig(process.env.DIRECT_URL));
+  let source: DatabaseSync | undefined;
   try {
-    databaseStatus = await lstat(databasePath);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-    throw new Error(
-      'The authentication database must already exist; preview does not create files.',
-    );
-  }
-  if (!databaseStatus.isFile()) {
-    throw new Error(
-      'The configured authentication database path is not a regular file; preview did not change it.',
-    );
-  }
-
-  const auth = getLocalAuth({ readOnly: true });
-  const database = auth.options.database;
-  if (!(database instanceof DatabaseSync)) {
-    throw new Error(
-      'Better Auth is not using the configured local SQLite database.',
-    );
-  }
-
-  try {
+    const auth = createAuth(configuration, pool);
     const migration = await getMigrations(auth.options);
-    if (migration.unsafeChanges.length || migration.schemaProblems.length) {
-      throw new Error(
-        'The existing authentication database has schema conflicts; preview did not modify it.',
+    if (migration.unsafeChanges.length || migration.schemaProblems.length)
+      throw new Error('Schema conflicts');
+    const sql = await migration.compileMigrations();
+    if (!process.argv.includes('--apply')) {
+      console.log(sql || 'Authentication schema is current.');
+      console.log(
+        'Preview only. --apply creates schema; --from-sqlite also copies the existing account database.',
+      );
+      return;
+    }
+    const importing = process.argv.includes('--from-sqlite');
+    if (importing) {
+      const sourcePath = resolve(
+        process.env.BETTER_AUTH_DATABASE_PATH || '.data/auth.sqlite',
+      );
+      source = new DatabaseSync(sourcePath, { readOnly: true });
+      const backupDirectory = resolve('.data/auth-backups');
+      await mkdir(backupDirectory, { recursive: true, mode: 0o700 });
+      const destination = resolve(backupDirectory, `auth-${Date.now()}.sqlite`);
+      await backup(source, destination);
+      await chmod(destination, 0o600);
+      source.exec('BEGIN');
+      console.log(
+        'Consistent private SQLite backup created; original database retained.',
       );
     }
-
-    console.log(await migration.compileMigrations());
-  } finally {
-    database.close();
-  }
-}
-
-async function setupAuthentication(): Promise<void> {
-  const projectRoot = process.cwd();
-  if (process.argv.includes('--preview')) {
-    await previewAuthentication(projectRoot);
-    return;
-  }
-
-  await ensureEnvironmentFile(projectRoot);
-
-  const configuration = readAuthConfiguration();
-  if (!configuration) {
-    throw new Error('Better Auth configuration is unavailable.');
-  }
-
-  const dataDirectory = resolve(projectRoot, '.data');
-  await mkdir(dataDirectory, { recursive: true, mode: 0o700 });
-  const dataDirectoryStatus = await lstat(dataDirectory);
-  if (!dataDirectoryStatus.isDirectory()) {
-    throw new Error(
-      '.data must be a real directory; the database was not changed.',
-    );
-  }
-  await chmod(dataDirectory, 0o700);
-
-  const databasePath = resolve(projectRoot, configuration.databasePath);
-  await ensureDatabaseFile(databasePath);
-
-  const auth = getLocalAuth();
-  const database = auth.options.database;
-  if (!(database instanceof DatabaseSync)) {
-    throw new Error(
-      'Better Auth is not using the configured local SQLite database.',
-    );
-  }
-
-  try {
-    const migration = await getMigrations(auth.options);
-    if (migration.unsafeChanges.length || migration.schemaProblems.length) {
-      throw new Error(
-        'The existing authentication database has schema conflicts; it was not modified.',
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SELECT pg_advisory_xact_lock(73194628)');
+      if (sql.trim()) await client.query(sql);
+      for (const table of tables) {
+        await client.query(
+          `ALTER TABLE ${quote(table)} ENABLE ROW LEVEL SECURITY`,
+        );
+        await client.query(
+          `REVOKE ALL ON TABLE ${quote(table)} FROM anon, authenticated`,
+        );
+        if (!source) continue;
+        const count = await client.query(
+          `SELECT count(*) AS n FROM ${quote(table)}`,
+        );
+        if (Number(count.rows[0].n) !== 0)
+          throw new Error('Destination is not empty; refusing to overwrite');
+        const columns = source
+          .prepare(`PRAGMA table_info(${quote(table)})`)
+          .all() as Array<{ name: string; type: string }>;
+        const rows = source.prepare(`SELECT * FROM ${quote(table)}`).all();
+        const converted = rows.map((row) =>
+          columns.map((column) => {
+            const value = row[column.name];
+            if (value === null) return null;
+            if (
+              /bool/i.test(column.type) ||
+              (table === 'user' &&
+                ['emailVerified', 'guideCompleted'].includes(column.name))
+            )
+              return Boolean(value);
+            if (/date/i.test(column.type)) {
+              const date = new Date(
+                typeof value === 'number'
+                  ? value
+                  : /^\d+$/.test(String(value))
+                    ? Number(value)
+                    : String(value),
+              );
+              if (!Number.isFinite(date.getTime()))
+                throw new Error('Invalid source date');
+              return date;
+            }
+            return value;
+          }),
+        );
+        for (const values of converted) {
+          await client.query(
+            `INSERT INTO ${quote(table)} (${columns.map((c) => quote(c.name)).join(',')}) VALUES (${columns.map((_, i) => '$' + (i + 1)).join(',')})`,
+            values,
+          );
+        }
+        const copied = await client.query(`SELECT * FROM ${quote(table)}`);
+        if (copied.rowCount !== rows.length)
+          throw new Error('Row count mismatch');
+        for (const values of converted) {
+          const id = values[columns.findIndex((c) => c.name === 'id')];
+          const row = copied.rows.find((r) => r.id === id);
+          if (!row) throw new Error('Account identity mismatch');
+          columns.forEach((column, index) => {
+            const expected = values[index];
+            const actual = row[column.name];
+            const same =
+              expected instanceof Date
+                ? actual instanceof Date &&
+                  actual.getTime() === expected.getTime()
+                : expected === null
+                  ? actual === null
+                  : String(actual) === String(expected);
+            if (!same) throw new Error('Copied data mismatch');
+          });
+        }
+        console.log(
+          `${table}: ${rows.length} rows verified without displaying account data.`,
+        );
+      }
+      await client.query(
+        'CREATE TABLE IF NOT EXISTS workspace ("userId" text PRIMARY KEY REFERENCES "user"(id) ON DELETE CASCADE, data jsonb NOT NULL, revision integer NOT NULL CHECK(revision>0), imports text[] NOT NULL DEFAULT ARRAY[]::text[])',
       );
+      await client.query(
+        'ALTER TABLE workspace ENABLE ROW LEVEL SECURITY; REVOKE ALL ON workspace FROM anon, authenticated',
+      );
+      await client.query('COMMIT');
+      console.log(
+        'PostgreSQL authentication schema ready; RLS enabled and public API roles denied.',
+      );
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
     }
-
-    await migration.runMigrations();
-
-    const tables = database
-      .prepare(
-        "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
-      )
-      .all() as Array<{ name: string }>;
-    const tableCounts = tables.map(({ name }) => {
-      const quotedName = `"${name.replaceAll('"', '""')}"`;
-      const result = database
-        .prepare(`SELECT COUNT(*) AS count FROM ${quotedName}`)
-        .get() as { count: number | bigint };
-      return `${name}: ${String(result.count)}`;
-    });
-
-    console.log(tableCounts.join('\n') || '0 tables');
   } finally {
-    database.close();
+    if (source) {
+      source.exec('ROLLBACK');
+      source.close();
+    }
+    await pool.end();
   }
 }
-
-setupAuthentication().catch((error: unknown) => {
+main().catch((error: unknown) => {
+  const code =
+    typeof error === 'object' && error !== null && 'code' in error
+      ? String(error.code)
+      : 'VALIDATION_FAILED';
   console.error(
-    error instanceof Error ? error.message : 'Authentication setup failed.',
+    'Migration failure code:',
+    /^[A-Z0-9_]+$/.test(code) ? code : 'UNKNOWN',
+  );
+  console.error(
+    'Authentication setup failed. No partial database transaction was committed; source SQLite is preserved. Connection details and account data are withheld.',
   );
   process.exitCode = 1;
 });

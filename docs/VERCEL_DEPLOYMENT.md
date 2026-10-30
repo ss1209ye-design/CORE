@@ -4,25 +4,16 @@
 
 앱 설치·실행은 [시작 안내](SETUP.md), Supabase 프로젝트 생성·CA 다운로드·로컬 .env·개발 테이블 생성은 [Supabase DB 설정과 연결하기](SUPABASE_SETUP.md)를 먼저 확인하세요. DB가 없는 기본 화면만 배포한다면 Supabase 설정은 생략할 수 있습니다.
 
-## 현재 꿀잡의 배포 제한
+## 현재 꿀잡의 배포 상태
 
-현재 회원가입·로그인·세션·요청 제한은 Better Auth와 로컬 SQLite 파일을 사용합니다. 준비 기록은 계정별 브라우저 저장소에 있습니다. 아래 빌드 설정이 맞거나 빌드가 통과해도 이 상태로 Vercel의 회원 기능을 운영할 수 있다는 뜻은 아닙니다. SQLite 파일을 업로드하거나 임시 파일 경로로 옮기는 방식은 사용하지 않습니다. **외부 DB 이전과 검증 전에는 Create Project를 통한 실제 서비스 배포를 보류합니다.**
+인증·세션·요청 제한과 계정별 준비 기록은 Supabase PostgreSQL로 이전했습니다. 로컬 계정 이전·로그인·기록 재조회·빌드를 검증했으며 Vercel 운영 배포는 아직 검증하지 않았습니다.
 
-현재 CORE 저장소의 프로젝트는 저장소 루트에 있으므로 Root Directory는 기본값(루트), Framework는 Next.js, Node.js는 24.x, 설치 명령은 npm ci입니다. 빌드 설정은 아래 검사 명령의 실제 통과 여부를 확인한 뒤 적용합니다. Output Directory는 Next.js 기본값을 유지합니다.
-
-환경 변수는 값이 아닌 다음 이름과 출처를 확인합니다.
-
-- BETTER_AUTH_URL: 운영용 HTTPS 도메인. localhost 값을 Vercel에 복사하지 않습니다.
-- BETTER_AUTH_SECRET: 기존 로컬 .env.local에 보관된 서버 비밀값. 공개하거나 NEXT_PUBLIC_ 이름으로 옮기지 않습니다.
-- BETTER_AUTH_DATABASE_PATH: 현재 로컬 전용 SQLite 경로입니다. Vercel용 해결책이 아닙니다.
-- BAZE_API_KEY: 학교 BAZE(https://factchat-cloud.mindlogic.ai)의 API Gateway에서 발급한 키를 Vercel 프로젝트 Settings → Environment Variables에 직접 입력합니다. Production·Preview 중 실제 사용할 환경을 선택하고 재배포합니다. NEXT_PUBLIC_ 접두어를 붙이지 않습니다.
-- AI 주소와 모델은 코드에 고정되어 별도 환경변수가 필요하지 않습니다. 기존 GEMINI_API_KEY·GEMINI_FREE_TIER_CONFIRMED는 사용하지 않습니다. 지원 크레딧과 조직별 모델 권한은 학교 BAZE 관리자에게 확인하며, 한도 초과 시 별도 결제나 다른 서비스로 전환하지 않습니다.
-- DATABASE_URL: 승인 후 선택할 외부 PostgreSQL의 런타임 연결 설정에서 확인합니다. 현재 이 값만 추가해도 Better Auth가 PostgreSQL로 바뀌지는 않습니다.
-- DIRECT_URL: 승인된 별도 마이그레이션 작업용 연결 주소이며 일반 앱 런타임에 무조건 등록하지 않습니다.
-
-DB 이전은 별도 승인 후 진행합니다. 일관된 SQLite 백업(진행 중인 WAL 포함)을 먼저 확보하고 별도 테스트 DB에서 복원·이전합니다. Better Auth의 기존 사용자 ID, 사용자명, 비밀번호 해시, 계정 관계와 안내 완료 상태를 보존합니다. 현재 Prisma의 예시 User 모델을 실제 인증 테이블로 간주하거나 ID를 새로 발급하지 않습니다. 세션·요청 제한 저장도 함께 검토하고 새 도메인에서는 재로그인이 필요할 수 있습니다. 행 수·관계·로그인과 기존 자료 연결을 비교한 뒤 전환하며, 원본 DB와 복구 가능한 백업을 삭제하지 않습니다.
-
-localhost와 Vercel은 서로 다른 출처이므로 같은 브라우저에서도 기존 준비 기록이 자동으로 보이지 않습니다. 기존 브라우저에서 자료를 보존·내보낸 뒤 로그인한 계정에 사용자가 확인하여 가져오는 절차와 서버 소유권 검증이 필요합니다. 이 가져오기·서버 동기화는 아직 구현되지 않았으며, 기존 브라우저 값을 자동 삭제하거나 다른 계정에 재배정하지 않습니다.
+- Production 환경변수: DATABASE_URL(Transaction pooler), BETTER_AUTH_SECRET(기존 값), BETTER_AUTH_URL(실제 HTTPS 배포 원점), BAZE_API_KEY(학교 BAZE API Gateway 키).
+- DIRECT_URL은 로컬 DB 설정·이전용입니다. BETTER_AUTH_DATABASE_PATH와 함께 Vercel 런타임에는 등록하지 않습니다. 비밀값에 NEXT_PUBLIC_ 접두어를 붙이지 않습니다.
+- Root Directory: 저장소 루트. Framework: Next.js. Node.js: 24.x. 설치: npm ci. 빌드: npm run check && npm run build. Output Directory: 기본값.
+- certs/supabase-ca.crt는 next.config.ts에서 배포 포함을 지정했습니다. TLS 검증을 끄지 않습니다.
+- 기존 계정 ID와 비밀번호 해시·세션을 보존했습니다. 브라우저 원본은 원래 주소에서 같은 계정으로 접속할 때 서버로 합칩니다. 다른 출처의 localStorage는 자동으로 읽을 수 없으며 원본은 삭제하지 않습니다.
+- Vercel 실제 도메인에서 회원가입·로그인·로그아웃·세션 쿠키·저장·다른 브라우저 재조회와 요청 제한 IP 헤더를 확인해야 운영 배포 검증이 완료됩니다.
 
 ## 1. 배포 전 로컬 확인
 

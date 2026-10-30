@@ -1,6 +1,5 @@
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
+import type { Pool } from 'pg';
+import { getAuthDatabase } from './auth-database';
 import { betterAuth } from 'better-auth';
 import {
   APIError,
@@ -18,19 +17,12 @@ import {
   USERNAME_MIN_LENGTH,
 } from './auth-username';
 
-function createLocalAuth(configuration: AuthConfiguration, readOnly: boolean) {
-  const databasePath = resolve(configuration.databasePath);
-  if (!existsSync(databasePath)) {
-    throw new Error(
-      'The local authentication database is missing. Run the authentication setup script first.',
-    );
-  }
-
+export function createAuth(configuration: AuthConfiguration, database: Pool) {
   return betterAuth({
     baseURL: configuration.baseURL,
     secret: configuration.secret,
     trustedOrigins: [configuration.baseURL],
-    database: new DatabaseSync(databasePath, { readOnly }),
+    database,
     emailAndPassword: {
       enabled: true,
       requireEmailVerification: false,
@@ -124,43 +116,27 @@ function createLocalAuth(configuration: AuthConfiguration, readOnly: boolean) {
   });
 }
 
-type LocalAuth = ReturnType<typeof createLocalAuth>;
-
-type AuthSingleton = {
-  auth: LocalAuth;
-  configuration: AuthConfiguration;
-  readOnly: boolean;
-};
-
+type Auth = ReturnType<typeof createAuth>;
 const globalForAuth = globalThis as typeof globalThis & {
-  localAuth?: AuthSingleton;
+  auth?: { instance: Auth; configuration: AuthConfiguration };
 };
-
-export function getLocalAuth(options: { readOnly?: boolean } = {}): LocalAuth {
-  const readOnly = options.readOnly ?? false;
+export function getAuth(): Auth {
   const configuration = readAuthConfiguration();
-  if (!configuration) {
-    throw new Error(
-      'Local authentication configuration is missing or invalid.',
-    );
-  }
-
-  const existing = globalForAuth.localAuth;
+  if (!configuration)
+    throw new Error('Authentication configuration is missing or invalid.');
+  const existing = globalForAuth.auth;
   if (existing) {
     if (
       existing.configuration.baseURL !== configuration.baseURL ||
       existing.configuration.secret !== configuration.secret ||
-      existing.configuration.databasePath !== configuration.databasePath ||
-      existing.readOnly !== readOnly
-    ) {
+      existing.configuration.databaseURL !== configuration.databaseURL
+    )
       throw new Error(
-        'Local authentication configuration changed. Restart the server to apply it.',
+        'Restart the server to apply authentication configuration changes.',
       );
-    }
-    return existing.auth;
+    return existing.instance;
   }
-
-  const auth = createLocalAuth(configuration, readOnly);
-  globalForAuth.localAuth = { auth, configuration, readOnly };
-  return auth;
+  const instance = createAuth(configuration, getAuthDatabase());
+  globalForAuth.auth = { instance, configuration };
+  return instance;
 }

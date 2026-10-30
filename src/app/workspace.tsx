@@ -11,13 +11,21 @@ import { getRecruitmentDateErrors } from './recruitment-date';
 import ExperienceKeywords from './experience-keywords';
 import { demoExperiences } from './demo-experiences';
 import { requestAIResponse, useAIAvailability } from './ai-client';
+import { draftResultSchema, type AIJob } from '@/lib/ai-contract';
 import {
-  aiExperienceSchema,
-  aiJobSchema,
-  draftResultSchema,
-  type AIJob,
-} from '@/lib/ai-contract';
-import { interviewSessionSchema } from './interview-session';
+  experienceSchema,
+  essaySchema,
+  statuses,
+  experienceTypes,
+  performanceLevels,
+  jobSchema,
+  type Workspace,
+  type Job,
+  type Experience,
+  type Essay,
+  type DraftProvenance,
+} from './workspace-schema';
+import { createWorkspaceStore } from './workspace-store';
 import RecruitmentCalendar from './recruitment-calendar';
 import {
   useEffect,
@@ -30,144 +38,6 @@ import {
 } from 'react';
 import { z } from 'zod';
 
-const text = z.string().max(12000);
-const statuses = ['관심', '준비 중', '지원 완료', '전형 진행', '종료'] as const;
-const institutionTypes = [
-  '의원',
-  '병원',
-  '종합병원',
-  '상급종합병원',
-  '기타·미확인',
-] as const;
-const experienceTypes = [
-  '실습',
-  '근무',
-  '교육',
-  '자격',
-  '프로젝트',
-  '봉사활동',
-  '교내활동',
-  '프로젝트·수상',
-  '대외활동·프로젝트',
-] as const;
-const performanceLevels = [
-  '관찰',
-  '보조',
-  '지도하 수행',
-  '독립 수행',
-  '해당 없음',
-] as const;
-const experienceSchema = z.object({
-  id: text,
-  title: text,
-  category: z.enum(experienceTypes),
-  level: z.enum(performanceLevels),
-  period: text,
-  body: text,
-  keywords: z.array(z.string().min(1).max(80)).max(20).default([]),
-  demo: z.boolean(),
-});
-const conditionSchema = z.object({
-  id: text,
-  text,
-  evidence: text,
-  verified: z.boolean(),
-  experienceId: text,
-  reason: text,
-});
-const jobSchema = z.object({
-  role: z.string().max(300).default(''),
-  documents: text.default(''),
-  rawText: z.string().max(40000).default(''),
-  duties: text.default(''),
-  workConditions: text.default(''),
-  applicationPeriod: text.default(''),
-  applicationStart: text.default(''),
-  startDateConfirmed: z.boolean().default(false),
-  id: text,
-  title: text,
-  organization: text,
-  type: z.enum(institutionTypes),
-  attributes: text,
-  field: text,
-  source: text,
-  deadline: text,
-  dateConfirmed: z.boolean(),
-  status: z.enum(statuses),
-  confirmed: z.boolean(),
-  demo: z.boolean(),
-  conditions: z.array(conditionSchema).max(40),
-  tasks: z
-    .array(
-      z.object({
-        id: text,
-        title: text,
-        due: text,
-        reason: text,
-        done: z.boolean(),
-      }),
-    )
-    .max(100),
-});
-const draftProvenanceSchema = z.object({
-  targetRole: z.string().max(300).default(''),
-  result: draftResultSchema,
-  provider: z.enum(['openai', 'gemini']),
-  model: z.string().max(100),
-  question: text,
-  jobSnapshot: aiJobSchema.nullable(),
-  experienceSnapshots: z.array(aiExperienceSchema).max(10),
-  generatedAt: text,
-});
-type DraftProvenance = z.infer<typeof draftProvenanceSchema>;
-const essaySchema = z.object({
-  targetRole: z.string().max(300).default(''),
-  ai: draftProvenanceSchema.nullable().default(null),
-  demo: z.boolean().default(false),
-  id: text,
-  jobId: text,
-  question: text,
-  experienceIds: z.array(text),
-  outline: text,
-  draft: text,
-  revised: text,
-  submissions: z
-    .array(z.object({ id: text, content: text, savedAt: text }))
-    .max(100),
-  keywords: text.default(''),
-});
-const interviewSchema = z.object({
-  id: text,
-  jobId: text,
-  question: text,
-  answer: text,
-  improvement: text,
-  reflection: text,
-  source: text,
-});
-const stateSchema = z.object({
-  version: z.literal(1),
-  profile: z.object({
-    profession: text,
-    career: text,
-    education: text,
-    license: text,
-    goals: text,
-    field: text,
-    environment: text,
-    institution: text,
-    attributes: text,
-  }),
-  experiences: z.array(experienceSchema).max(500),
-  jobs: z.array(jobSchema).max(500),
-  essays: z.array(essaySchema).max(500),
-  interviews: z.array(interviewSchema).max(500),
-  interviewSessions: z.array(interviewSessionSchema).max(200).default([]),
-});
-type Workspace = z.infer<typeof stateSchema>;
-type Job = z.infer<typeof jobSchema>;
-type Experience = z.infer<typeof experienceSchema>;
-type Essay = z.infer<typeof essaySchema>;
 type Section =
   'dashboard' | 'profile' | 'experiences' | 'prepare' | 'essays' | 'interview';
 type Editor = { kind: 'job' | 'experience' | 'task' | 'link'; id?: string };
@@ -228,112 +98,6 @@ function sourceURL(value: string) {
   } catch {
     return '';
   }
-}
-function emptyState(): Workspace {
-  return {
-    version: 1,
-    profile: {
-      profession: '물리치료',
-      career: '',
-      education: '',
-      license: '',
-      goals: '',
-      field: '',
-      environment: '',
-      institution: '',
-      attributes: '',
-    },
-    experiences: [],
-    jobs: [],
-    essays: [],
-    interviews: [],
-    interviewSessions: [],
-  };
-}
-function createWorkspaceStore(userId: string) {
-  const storageKey = 'kkuljob.workspace.v1:' + userId;
-
-  // This store is browser-only. The stable server snapshot avoids hydration differences.
-  let workspace: Workspace | null = null;
-  let storageWarning = '';
-  let storageBlocked = false;
-  const subscribers = new Set<() => void>();
-  const emit = () => subscribers.forEach((listener) => listener());
-  function getSnapshot() {
-    return workspace;
-  }
-  function serverSnapshot() {
-    return null;
-  }
-  function crossTab(event: StorageEvent) {
-    if (event.key === storageKey || event.key === null) {
-      storageBlocked = true;
-      storageWarning =
-        '다른 창에서 기록이 변경되었습니다. 덮어쓰기를 막기 위해 저장을 중지했습니다. 이 화면의 미저장 내용을 복사한 뒤 새로고침해 주세요.';
-      if (workspace) workspace = { ...workspace };
-      emit();
-    }
-  }
-  function subscribe(listener: () => void) {
-    subscribers.add(listener);
-    if (subscribers.size === 1) window.addEventListener('storage', crossTab);
-    if (!workspace) {
-      try {
-        const raw = localStorage.getItem(storageKey);
-        workspace = raw ? stateSchema.parse(JSON.parse(raw)) : emptyState();
-      } catch {
-        workspace = emptyState();
-        storageBlocked = true;
-        storageWarning =
-          '저장된 기록을 읽을 수 없거나 브라우저 저장이 제한되었습니다. 기존 데이터는 덮어쓰지 않습니다. 새 입력은 새로고침하면 사라집니다.';
-      }
-      emit();
-    }
-    return () => {
-      subscribers.delete(listener);
-      if (!subscribers.size) window.removeEventListener('storage', crossTab);
-    };
-  }
-  function persist(next: Workspace): { saved: boolean; message: string } {
-    const result = stateSchema.safeParse(next);
-    if (!result.success)
-      return {
-        saved: false,
-        message:
-          '저장하지 못했습니다. 입력 길이 또는 기록 개수 제한을 확인해 주세요.',
-      };
-    if (storageBlocked)
-      return {
-        saved: false,
-        message:
-          '저장 충돌 또는 제한으로 저장하지 못했습니다. 입력을 복사한 뒤 저장소 안내를 확인해 주세요.',
-      };
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(result.data));
-      workspace = result.data;
-      storageWarning = '';
-      emit();
-      return { saved: true, message: '이 브라우저에 저장했습니다.' };
-    } catch {
-      storageWarning =
-        '브라우저 저장 공간이 부족하거나 저장이 제한되었습니다. 기존 기록은 변경하지 않았습니다. 입력창의 내용을 복사해 보관한 뒤 다시 저장해 주세요.';
-      if (workspace) workspace = { ...workspace };
-      emit();
-      return {
-        saved: false,
-        message: '브라우저 저장에 실패했습니다. 입력창의 내용은 유지됩니다.',
-      };
-    }
-  }
-  return {
-    subscribe,
-    getSnapshot,
-    serverSnapshot,
-    persist,
-    get warning() {
-      return storageWarning;
-    },
-  };
 }
 
 function Icon({ name }: { name: string }) {
@@ -727,8 +491,8 @@ export default function WorkspaceScreen({
       documents: job.documents,
     };
   }
-  function update(next: Workspace) {
-    const result = store.persist(next);
+  async function update(next: Workspace) {
+    const result = await store.persist(next);
     setMessage(result.message);
     return result.saved;
   }
@@ -801,8 +565,8 @@ export default function WorkspaceScreen({
       else main.current?.focus({ preventScroll: true });
     });
   }
-  function updateJob(job: Job) {
-    return update({
+  async function updateJob(job: Job) {
+    return await update({
       ...data!,
       jobs: data!.jobs.map((item) => (item.id === job.id ? job : item)),
     });
@@ -813,19 +577,19 @@ export default function WorkspaceScreen({
     setSelectedJob(job.id);
     setSection('prepare');
   }
-  function toggleTask(job: Job, taskId: string) {
-    updateJob({
+  async function toggleTask(job: Job, taskId: string) {
+    await updateJob({
       ...job,
       tasks: job.tasks.map((task) =>
         task.id === taskId ? { ...task, done: !task.done } : task,
       ),
     });
   }
-  function saveProfile(event: FormEvent<HTMLFormElement>) {
+  async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const value = (name: string) => String(form.get(name) || '').trim();
-    const saved = update({
+    const saved = await update({
       ...data!,
       profile: {
         profession: value('profession'),
@@ -842,7 +606,7 @@ export default function WorkspaceScreen({
     if (saved) setDirty(false);
   }
 
-  function confirmApplication() {
+  async function confirmApplication() {
     if (!current || current.confirmed) return;
     if (
       !window.confirm(
@@ -864,9 +628,9 @@ export default function WorkspaceScreen({
             done: false,
           });
       });
-    updateJob({ ...current, confirmed: true, status: '준비 중', tasks });
+    await updateJob({ ...current, confirmed: true, status: '준비 중', tasks });
   }
-  function saveEditor(event: FormEvent<HTMLFormElement>) {
+  async function saveEditor(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!editor) return;
     const form = new FormData(event.currentTarget);
@@ -902,7 +666,7 @@ export default function WorkspaceScreen({
         setFormError('입력 형식과 길이를 확인해 주세요.');
         return;
       }
-      saved = update({
+      saved = await update({
         ...data!,
         experiences: old
           ? data!.experiences.map((item) =>
@@ -1008,7 +772,7 @@ export default function WorkspaceScreen({
         setFormError('공고 입력 형식을 확인해 주세요.');
         return;
       }
-      saved = update({
+      saved = await update({
         ...data!,
         jobs: old
           ? data!.jobs.map((item) => (item.id === old.id ? parsed.data : item))
@@ -1024,7 +788,7 @@ export default function WorkspaceScreen({
         setFormError('기한을 사용하려면 직접 확인한 날짜임을 체크해 주세요.');
         return;
       }
-      saved = updateJob({
+      saved = await updateJob({
         ...current,
         tasks: [
           ...current.tasks,
@@ -1048,7 +812,7 @@ export default function WorkspaceScreen({
         );
         return;
       }
-      saved = updateJob({
+      saved = await updateJob({
         ...current,
         conditions: current.conditions.map((condition) =>
           condition.id === editor.id
@@ -1071,7 +835,7 @@ export default function WorkspaceScreen({
     }
     closeEditor(true);
   }
-  function deleteExperience(experience: Experience) {
+  async function deleteExperience(experience: Experience) {
     const count = data!.jobs.reduce(
       (sum, job) =>
         sum +
@@ -1086,7 +850,7 @@ export default function WorkspaceScreen({
       )
     )
       return;
-    const saved = update({
+    const saved = await update({
       ...data!,
       experiences: data!.experiences.filter(
         (item) => item.id !== experience.id,
@@ -1199,7 +963,7 @@ export default function WorkspaceScreen({
       }
     }
   }
-  function saveEssay(event: FormEvent<HTMLFormElement>) {
+  async function saveEssay(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const value = (name: string) => String(form.get(name) || '').trim();
@@ -1224,7 +988,7 @@ export default function WorkspaceScreen({
         currentDraftAI?.experienceSnapshots.some((item) => item.demo),
       ),
     };
-    const saved = update({
+    const saved = await update({
       ...data!,
       essays: chosenEssay
         ? data!.essays.map((item) => (item.id === chosenEssay.id ? next : item))
@@ -1239,7 +1003,7 @@ export default function WorkspaceScreen({
     setDirty(false);
     setFormError('');
   }
-  function freezeSubmission() {
+  async function freezeSubmission() {
     if (dirty) {
       setFormError('현재 편집 내용을 먼저 저장해 주세요.');
       return;
@@ -1259,7 +1023,7 @@ export default function WorkspaceScreen({
       content: chosenEssay.revised,
       savedAt: new Date().toISOString(),
     };
-    update({
+    await update({
       ...data!,
       essays: data!.essays.map((essay) =>
         essay.id === chosenEssay.id
@@ -1269,7 +1033,7 @@ export default function WorkspaceScreen({
     });
     setFormError('');
   }
-  function newWriting() {
+  async function newWriting() {
     if (!allowLeave()) return;
     const next = essaySchema.parse({
       id: id(),
@@ -1282,12 +1046,12 @@ export default function WorkspaceScreen({
       revised: '',
       submissions: [],
     });
-    if (!update({ ...data!, essays: [...data!.essays, next] })) return;
+    if (!(await update({ ...data!, essays: [...data!.essays, next] }))) return;
     setDirty(false);
     setFormError('');
     setEssayId(next.id);
   }
-  function addDemoExperience(index: number) {
+  async function addDemoExperience(index: number) {
     const sample = demoExperiences[index];
     if (!sample) return;
     const existing = data!.experiences.find(
@@ -1306,7 +1070,12 @@ export default function WorkspaceScreen({
       demo: true,
       keywords: [],
     });
-    if (update({ ...data!, experiences: [experience, ...data!.experiences] }))
+    if (
+      await update({
+        ...data!,
+        experiences: [experience, ...data!.experiences],
+      })
+    )
       openEditor({ kind: 'experience', id: experience.id });
   }
 
@@ -1722,25 +1491,28 @@ export default function WorkspaceScreen({
                           </Button>
                           <button
                             className="danger-button"
-                            onClick={() => {
+                            onClick={async () => {
                               if (
                                 !window.confirm(
                                   '공고와 연결된 할 일·자소서·제출본·면접 기록을 모두 삭제할까요? 경험 원본은 남으며 삭제는 되돌릴 수 없습니다.',
                                 )
                               )
                                 return;
-                              update({
-                                ...data,
-                                jobs: data.jobs.filter(
-                                  (job) => job.id !== current.id,
-                                ),
-                                essays: data.essays.filter(
-                                  (essay) => essay.jobId !== current.id,
-                                ),
-                                interviews: data.interviews.filter(
-                                  (item) => item.jobId !== current.id,
-                                ),
-                              });
+                              if (
+                                !(await update({
+                                  ...data,
+                                  jobs: data.jobs.filter(
+                                    (job) => job.id !== current.id,
+                                  ),
+                                  essays: data.essays.filter(
+                                    (essay) => essay.jobId !== current.id,
+                                  ),
+                                  interviews: data.interviews.filter(
+                                    (item) => item.jobId !== current.id,
+                                  ),
+                                }))
+                              )
+                                return;
                               setSelectedJob('');
                             }}
                           >
@@ -1751,11 +1523,11 @@ export default function WorkspaceScreen({
                           실제 지원 진행 상태
                           <select
                             value={current.status}
-                            onChange={(event) => {
+                            onChange={async (event) => {
                               const status = z
                                 .enum(statuses)
                                 .parse(event.target.value);
-                              updateJob({ ...current, status });
+                              await updateJob({ ...current, status });
                             }}
                           >
                             {statuses.map((status) => (
@@ -1843,11 +1615,11 @@ export default function WorkspaceScreen({
                             <button
                               className="icon-button"
                               aria-label={`${task.title} 삭제`}
-                              onClick={() => {
+                              onClick={async () => {
                                 if (
                                   window.confirm('이 준비 항목을 삭제할까요?')
                                 )
-                                  updateJob({
+                                  await updateJob({
                                     ...current,
                                     tasks: current.tasks.filter(
                                       (item) => item.id !== task.id,
@@ -2101,19 +1873,22 @@ export default function WorkspaceScreen({
                       <button
                         type="button"
                         className="danger-button"
-                        onClick={() => {
+                        onClick={async () => {
                           if (
                             !window.confirm(
                               '이 문항의 초안·수정본·제출본을 모두 삭제할까요?',
                             )
                           )
                             return;
-                          update({
-                            ...data,
-                            essays: data.essays.filter(
-                              (essay) => essay.id !== chosenEssay.id,
-                            ),
-                          });
+                          if (
+                            !(await update({
+                              ...data,
+                              essays: data.essays.filter(
+                                (essay) => essay.id !== chosenEssay.id,
+                              ),
+                            }))
+                          )
+                            return;
                           setEssayId('');
                           setDirty(false);
                         }}
@@ -2226,9 +2001,9 @@ export default function WorkspaceScreen({
                         <p className="preserve">{submission.content}</p>
                         <button
                           className="danger-button"
-                          onClick={() => {
+                          onClick={async () => {
                             if (window.confirm('이 제출본을 삭제할까요?'))
-                              update({
+                              await update({
                                 ...data,
                                 essays: data.essays.map((essay) =>
                                   essay.id === chosenEssay.id
@@ -2270,8 +2045,8 @@ export default function WorkspaceScreen({
                 sessions={data.interviewSessions}
                 legacyQuestions={data.interviews}
                 onDirtyChange={setDirty}
-                onSave={(session) =>
-                  update({
+                onSave={async (session) =>
+                  await update({
                     ...data,
                     interviewSessions: data.interviewSessions.some(
                       (item) => item.id === session.id,
