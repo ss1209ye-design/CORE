@@ -17,12 +17,14 @@ const options = {
 };
 async function configured(run: () => Promise<void>) {
   const names = [
+    'BAZE_API_KEY',
     'GEMINI_API_KEY',
     'GEMINI_FREE_TIER_CONFIRMED',
     'GEMINI_MODEL',
     'GOOGLE_GENAI_USE_VERTEXAI',
   ];
   const previous = names.map((name) => process.env[name]);
+  process.env.BAZE_API_KEY = 'synthetic-baze-test-key';
   process.env.GEMINI_API_KEY = 'synthetic-gemini-test-key';
   process.env.GEMINI_FREE_TIER_CONFIRMED = 'true';
   process.env.GEMINI_MODEL = 'gemini-paid-model';
@@ -46,21 +48,20 @@ function result(text = '{"text":"가상 결과"}', status = 'completed') {
     ],
   });
 }
-test('키와 Free 프로젝트 확인을 모두 요구하고 확인 전에는 요청하지 않는다', async () =>
+test('BAZE 키 없이는 기존 Google 키가 있어도 요청하지 않는다', async () =>
   configured(async () => {
     let calls = 0;
     const transport: typeof fetch = async () => {
       calls++;
       return result();
     };
-    delete process.env.GEMINI_API_KEY;
+    delete process.env.BAZE_API_KEY;
     assert.equal(isAIConfigured(), false);
     await assert.rejects(
       generateGeminiJSON(options, undefined, transport),
       AIConfigurationRequiredError,
     );
-    process.env.GEMINI_API_KEY = 'synthetic-gemini-test-key';
-    process.env.GEMINI_FREE_TIER_CONFIRMED = 'false';
+    process.env.BAZE_API_KEY = '   ';
     assert.equal(isAIConfigured(), false);
     await assert.rejects(
       generateGeminiJSON(options, undefined, transport),
@@ -68,7 +69,7 @@ test('키와 Free 프로젝트 확인을 모두 요구하고 확인 전에는 �
     );
     assert.equal(calls, 0);
   }));
-test('실제 SDK 직렬화는 고정 Gemini 모델·단발 생성·이미지 입력을 단일 공식 요청으로 보낸다', async () =>
+test('SDK는 고정 모델·단발 생성·이미지 입력을 BAZE에만 보낸다', async () =>
   configured(async () => {
     let calls = 0;
     const checks: Array<() => void> = [];
@@ -79,16 +80,13 @@ test('실제 SDK 직렬화는 고정 Gemini 모델·단발 생성·이미지 입
       const headers = request.headers;
       const body = await request.json();
       checks.push(() => {
-        assert.equal(u.origin, 'https://generativelanguage.googleapis.com');
+        assert.equal(u.origin, 'https://factchat-cloud.mindlogic.ai');
         assert.equal(
           u.pathname,
-          '/v1beta/models/gemini-3.6-flash:generateContent',
+          '/v1/gateway/gemini/v1beta/models/gemini-3.6-flash:generateContent',
         );
         assert.equal(u.search, '');
-        assert.equal(
-          headers.get('x-goog-api-key'),
-          'synthetic-gemini-test-key',
-        );
+        assert.equal(headers.get('x-goog-api-key'), 'synthetic-baze-test-key');
         assert.equal(body.contents[0].role, 'user');
         assert.equal(
           body.generationConfig.thinkingConfig.thinkingLevel,
@@ -129,7 +127,7 @@ test('실제 SDK 직렬화는 고정 Gemini 모델·단발 생성·이미지 입
     assert.equal(calls, 1);
     assert.equal(getAIModel(), 'gemini-3.6-flash');
   }));
-test('무료 할당량 초과 429는 안전한 안내로 반환하고 재시도·유료 전환하지 않는다', async () =>
+test('학교 한도 초과 429는 안전한 안내로 반환하고 재시도·유료 전환하지 않는다', async () =>
   configured(async () => {
     let calls = 0;
     const transport: typeof fetch = async () => {
@@ -151,14 +149,14 @@ test('무료 할당량 초과 429는 안전한 안내로 반환하고 재시도�
         error instanceof AIProviderError &&
         error.status === 429 &&
         error.code === 'AI_QUOTA_EXCEEDED' &&
-        error.message.includes('무료') &&
+        error.message.includes('학교 지원') &&
         !error.message.includes('synthetic-private'),
     );
     assert.equal(calls, 1);
   }));
 test('인증 실패·모델 없음·서버 오류에서 원문 오류를 노출하거나 다른 모델로 재시도하지 않는다', async () =>
   configured(async () => {
-    for (const status of [403, 404, 500]) {
+    for (const status of [401, 402, 403, 404, 500]) {
       let calls = 0;
       const transport: typeof fetch = async () => {
         calls++;

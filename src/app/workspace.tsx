@@ -1906,14 +1906,14 @@ export default function WorkspaceScreen({
                 </p>
               )}
               <div className="notice">
-                선택한 경험과 문항을 Google Gemini에 전달해 초안을 제안합니다.
-                공고를 선택하면 공고 자료도 함께 전달하고, 공고 없이 작성하면
-                선택한 경험만 사용합니다. 기록에 없는 성과나 사실은 추가하지
-                않습니다. 무료 등급에서는 입력과 출력이 Google 제품 개선에
-                사용될 수 있으므로 시연에는 가상의 비민감 정보만 사용하세요.
-                개인정보·환자 식별 정보·연락처·비밀값은 입력하지 마세요. AI 준비
-                상태는 서버 설정값이 존재한다는 뜻일 뿐, 키 유효성이나
-                프로젝트의 Free 등급·청구 상태를 확인한 것은 아닙니다.
+                선택한 경험과 문항을 BAZE를 통해 Gemini에 전달해 초안을
+                제안합니다. 공고를 선택하면 공고 자료도 함께 전달하고, 공고 없이
+                작성하면 선택한 경험만 사용합니다. 기록에 없는 성과나 사실은
+                추가하지 않습니다. 학교 지원 크레딧이 사용되므로 필요한 요청만
+                실행하고 시연에는 가상의 비민감 정보만 사용하세요. 개인정보·환자
+                식별 정보·연락처·비밀값은 입력하지 마세요. AI 준비 상태는 서버
+                설정값이 존재한다는 뜻일 뿐, 키 유효성이나 학교 계정의 남은
+                크레딧을 확인한 것은 아닙니다.
               </div>
               <div className="toolbar">
                 <select
@@ -2007,7 +2007,7 @@ export default function WorkspaceScreen({
                     {aiAvailability.state !== 'ready' && (
                       <p className="notice">
                         {aiAvailability.state === 'missing'
-                          ? 'Google 프로젝트가 미청구 Free 등급인지 확인한 뒤에만 서버에 GEMINI_API_KEY와 GEMINI_FREE_TIER_CONFIRMED=true를 설정하고 재시작하세요. 키는 채팅이나 브라우저에 입력하지 마세요.'
+                          ? '서버 BAZE_API_KEY에 학교 BAZE 키를 설정하고 서버를 재시작하세요. 키는 채팅이나 브라우저에 입력하지 마세요.'
                           : aiAvailability.state === 'checking'
                             ? 'AI 설정 확인 중…'
                             : 'AI 설정을 확인하지 못했습니다.'}{' '}

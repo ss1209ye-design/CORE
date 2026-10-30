@@ -337,7 +337,7 @@ export default function InterviewQuestionBuilder({
             {availability.state === 'checking'
               ? 'AI 연결 설정 확인 중…'
               : availability.state === 'missing'
-                ? 'Google 프로젝트가 미청구 Free 등급인지 확인한 뒤에만 서버에 GEMINI_API_KEY와 GEMINI_FREE_TIER_CONFIRMED=true를 설정하고 재시작하세요. 키는 채팅이나 브라우저에 입력하지 마세요. 고정 질문을 AI 결과로 대신 표시하지 않습니다.'
+                ? '서버 BAZE_API_KEY에 학교 BAZE 키를 설정하고 서버를 재시작하세요. 키는 채팅이나 브라우저에 입력하지 마세요. 고정 질문을 AI 결과로 대신 표시하지 않습니다.'
                 : 'AI 연결 설정을 확인하지 못했습니다. 로그인과 연결 상태를 확인해 주세요.'}
           </p>
           <button

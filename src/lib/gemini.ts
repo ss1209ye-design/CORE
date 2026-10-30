@@ -5,10 +5,7 @@ import { z } from 'zod';
 import { GEMINI_MODEL, AI_TIMEOUT_MS } from '@/lib/ai-contract';
 const TIMEOUT_MS = AI_TIMEOUT_MS;
 export function isAIConfigured(): boolean {
-  return (
-    Boolean(process.env.GEMINI_API_KEY?.trim()) &&
-    process.env.GEMINI_FREE_TIER_CONFIRMED === 'true'
-  );
+  return Boolean(process.env.BAZE_API_KEY?.trim());
 }
 export function getAIModel(): string {
   return GEMINI_MODEL;
@@ -16,7 +13,7 @@ export function getAIModel(): string {
 export class AIConfigurationRequiredError extends Error {
   constructor() {
     super(
-      '서버 GEMINI_API_KEY 설정과 결제가 연결되지 않은 Free 프로젝트 확인이 필요합니다. 확인 후 GEMINI_FREE_TIER_CONFIRMED=true로 설정하고 서버를 다시 시작해 주세요.',
+      '서버 BAZE_API_KEY 설정이 필요합니다. 학교 BAZE API Gateway에서 발급한 키를 서버 환경변수에 입력하고 재시작해 주세요. 키는 채팅이나 브라우저에 입력하지 마세요.',
     );
     this.name = 'AIConfigurationRequiredError';
   }
@@ -53,23 +50,23 @@ function providerError(error: unknown): AIProviderError {
           ? error.statusCode
           : undefined
       : undefined;
-  if (status === 429)
+  if (status === 402 || status === 429)
     return new AIProviderError(
-      'Gemini 무료 사용 한도에 도달했거나 현재 프로젝트에 사용 가능한 할당량이 없습니다. 입력은 유지됩니다. AI Studio에서 한도를 확인하고 나중에 다시 시도하거나 직접 입력을 사용해 주세요. 유료 모델로 전환하지 않습니다.',
-      true,
+      'BAZE 학교 지원 크레딧 또는 요청 한도에 도달했습니다. 입력은 유지됩니다. 학교 BAZE 관리자에게 한도를 확인해 주세요. 자동 재시도·별도 결제·다른 서비스로 전환하지 않습니다.',
+      status === 429,
       429,
       'AI_QUOTA_EXCEEDED',
     );
   if (status === 401 || status === 403)
     return new AIProviderError(
-      'Gemini 키·프로젝트 권한·사용 가능 지역을 확인해 주세요. 결제를 연결하지 말고 Free 프로젝트인지 확인해 주세요. 입력은 유지됩니다.',
+      'BAZE 키의 발급 서버와 학교 계정의 모델 사용 권한을 확인해 주세요. 입력은 유지됩니다. 다른 서비스로 전환하지 않습니다.',
       false,
       503,
       'AI_ACCESS_DENIED',
     );
   if (status === 404)
     return new AIProviderError(
-      '설정된 무료 등급 모델을 현재 사용할 수 없습니다. 자동으로 다른 모델에 연결하지 않습니다. 입력은 유지됩니다.',
+      '설정된 BAZE 모델을 현재 사용할 수 없습니다. 자동으로 다른 모델에 연결하지 않습니다. 입력은 유지됩니다.',
       false,
       503,
       'AI_MODEL_UNAVAILABLE',
@@ -87,7 +84,7 @@ function providerError(error: unknown): AIProviderError {
       'AI_TIMEOUT',
     );
   return new AIProviderError(
-    'Gemini 연결에 실패했습니다. 입력은 유지됩니다. 잠시 후 직접 다시 시도해 주세요.',
+    'BAZE 연결에 실패했습니다. 입력은 유지됩니다. 잠시 후 직접 다시 시도해 주세요.',
     true,
     502,
     'AI_PROVIDER_ERROR',
@@ -121,12 +118,12 @@ export async function generateGeminiJSON<T>(
   });
   try {
     const client = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY!.trim(),
+      apiKey: process.env.BAZE_API_KEY!.trim(),
       enterprise: false,
       vertexai: false,
       apiVersion: 'v1beta',
       httpOptions: {
-        baseUrl: 'https://generativelanguage.googleapis.com',
+        baseUrl: 'https://factchat-cloud.mindlogic.ai/v1/gateway/gemini',
         timeout: TIMEOUT_MS,
         retryOptions: { attempts: 1 },
         fetch: (url, init) =>

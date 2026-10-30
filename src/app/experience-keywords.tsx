@@ -191,7 +191,7 @@ export default function ExperienceKeywords({
             {availability.state === 'checking'
               ? 'AI 설정 확인 중…'
               : availability.state === 'missing'
-                ? '결제가 연결되지 않은 Free 프로젝트인지 확인한 뒤 서버 .env.local에 GEMINI_API_KEY와 GEMINI_FREE_TIER_CONFIRMED=true를 설정하고 서버를 재시작하세요.'
+                ? '서버 BAZE_API_KEY에 학교 BAZE 키를 설정하고 서버를 재시작하세요. 키는 채팅이나 브라우저에 입력하지 마세요.'
                 : 'AI 설정을 확인하지 못했습니다. 로그인과 연결 상태를 확인해 주세요.'}
           </p>
           <button

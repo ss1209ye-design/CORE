@@ -15,8 +15,8 @@
 - BETTER_AUTH_URL: 운영용 HTTPS 도메인. localhost 값을 Vercel에 복사하지 않습니다.
 - BETTER_AUTH_SECRET: 기존 로컬 .env.local에 보관된 서버 비밀값. 공개하거나 NEXT_PUBLIC_ 이름으로 옮기지 않습니다.
 - BETTER_AUTH_DATABASE_PATH: 현재 로컬 전용 SQLite 경로입니다. Vercel용 해결책이 아닙니다.
-- GEMINI_API_KEY: Google AI Studio의 해당 프로젝트 키 설정에서 확인합니다.
-- GEMINI_FREE_TIER_CONFIRMED: 결제가 연결되지 않은 Free 프로젝트임을 사용자가 확인한 경우에만 true로 설정합니다. 이 설정이 결제 상태를 자동 검증하지 않습니다.
+- BAZE_API_KEY: 학교 BAZE(https://factchat-cloud.mindlogic.ai)의 API Gateway에서 발급한 키를 Vercel 프로젝트 Settings → Environment Variables에 직접 입력합니다. Production·Preview 중 실제 사용할 환경을 선택하고 재배포합니다. NEXT_PUBLIC_ 접두어를 붙이지 않습니다.
+- AI 주소와 모델은 코드에 고정되어 별도 환경변수가 필요하지 않습니다. 기존 GEMINI_API_KEY·GEMINI_FREE_TIER_CONFIRMED는 사용하지 않습니다. 지원 크레딧과 조직별 모델 권한은 학교 BAZE 관리자에게 확인하며, 한도 초과 시 별도 결제나 다른 서비스로 전환하지 않습니다.
 - DATABASE_URL: 승인 후 선택할 외부 PostgreSQL의 런타임 연결 설정에서 확인합니다. 현재 이 값만 추가해도 Better Auth가 PostgreSQL로 바뀌지는 않습니다.
 - DIRECT_URL: 승인된 별도 마이그레이션 작업용 연결 주소이며 일반 앱 런타임에 무조건 등록하지 않습니다.
 
