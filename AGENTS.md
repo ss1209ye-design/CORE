@@ -131,3 +131,13 @@ DB가 필요 없는 기능이나 문구·스타일 수정은 관련 단계만 �
 - 재사용할 배포본에는 `node_modules/`, `.next/`, `src/generated_prisma/`, `next-env.d.ts`, `tsconfig.tsbuildinfo`, 실제 `.env`를 포함하지 않는다.
 - `package-lock.json`, `.env.example`, `.vscode/`, 이 파일과 `.agent/` 지침은 유지한다.
 - 생성물 삭제도 승인 범위인지 확인한다. 재귀 삭제·이동 전 절대 경로가 대상 프로젝트 내부인지 검증한다.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+## This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
