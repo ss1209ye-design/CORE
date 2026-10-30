@@ -44,3 +44,15 @@ next-env.d.ts
 !.env.example
 /src/generated_prisma/
 *.log
+
+# Legacy OCR artifacts are not used by the app
+/public/ocr/
+
+# Private local account storage
+/.data/
+
+# Private agent history and local databases
+.gjc/
+*.sqlite*
+*.db
+*.db-*

@@ -10,7 +10,9 @@ const eslintConfig = defineConfig([
   prettier,
   // Override default ignores of eslint-config-next.
   globalIgnores([
-    // Default ignores of eslint-config-next:
+    '.gjc/**',
+    '.data/**',
+    'public/ocr/runtime/**', // Default ignores of eslint-config-next:
     '.next/**',
     'out/**',
     'build/**',

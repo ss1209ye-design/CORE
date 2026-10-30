@@ -1,0 +1,212 @@
+.dialog {
+  width: min(840px, calc(100% - 16px));
+  font-family:
+    'Arial Rounded MT Bold', ui-rounded, var(--font-pretendard),
+    'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  max-height: 94dvh;
+  max-width: calc(100% - 16px);
+  margin: auto;
+  padding: 0 18px 18px;
+  border: 1px solid #e8e4dd;
+  border-radius: 22px;
+  background: #f7f5f1;
+  color: #151b31;
+  overflow: auto;
+}
+.dialog::backdrop {
+  background: rgb(21 27 49 / 55%);
+}
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 -18px;
+  padding: 12px 18px 8px;
+  border-bottom: 1px solid #e8e4dd;
+  background: #f7f5f1;
+  font-size: 13px;
+}
+.header button {
+  min-height: 36px;
+}
+.progress {
+  margin: 8px auto;
+  width: min(100%, 460px);
+  font-size: 12px;
+  text-align: center;
+}
+.progress p {
+  margin: 0 0 5px;
+}
+.progress progress {
+  width: 100%;
+  height: 5px;
+  appearance: none;
+  border: 0;
+  background: #e8e4dd;
+}
+.dialog h2 {
+  text-align: center;
+  font-size: clamp(15px, 2vw, 19px);
+  line-height: 1.5;
+  margin: 12px 0 0;
+}
+.scene {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 280px) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  width: min(100%, 760px);
+  margin: 8px auto 0;
+}
+.bubble {
+  display: block;
+  width: min(100%, 220px);
+  height: auto;
+}
+.bubbleOne {
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: end;
+}
+.bubbleTwo {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: start;
+}
+.character {
+  position: relative;
+  grid-column: 2;
+  grid-row: 1;
+  inline-size: 100%;
+  block-size: 300px;
+}
+.character .pig {
+  inline-size: 280px;
+  block-size: 300px;
+  min-block-size: 0;
+  margin: 0 auto;
+}
+.explanation {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  width: min(100%, 720px);
+  min-width: 0;
+  justify-self: center;
+}
+.speech {
+  width: 100%;
+  text-align: center;
+  white-space: pre-line;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  font-size: clamp(14px, 1.5vw, 16px);
+  line-height: 1.65;
+}
+.cursor {
+  display: inline-block;
+  height: 1em;
+  width: 2px;
+  background: currentColor;
+  margin-left: 2px;
+  vertical-align: -0.1em;
+  animation: piggyCaret 1s step-end infinite;
+}
+.arrow {
+  position: absolute;
+  top: 150px;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid #e8e4dd;
+  border-radius: 50%;
+  background: #fff;
+  font-size: 28px;
+  color: #151b31;
+}
+.previous {
+  left: 0;
+}
+.next {
+  right: 0;
+}
+.footer {
+  text-align: center;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+@keyframes piggyCaret {
+  50% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cursor {
+    animation: none;
+  }
+}
+@media (max-width: 600px) {
+  .dialog {
+    padding: 0 12px 12px;
+  }
+  .header {
+    top: 0;
+    margin: 0 -12px;
+    padding: 8px 12px;
+  }
+  .scene {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+    width: 100%;
+  }
+  .bubble {
+    width: min(100%, 125px);
+  }
+  .bubbleOne {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .bubbleTwo {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .character {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    inline-size: min(100%, 200px);
+    block-size: 215px;
+    justify-self: center;
+  }
+  .character .pig {
+    inline-size: 200px;
+    block-size: 215px;
+  }
+  .explanation {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    width: 100%;
+  }
+  .arrow {
+    top: 107px;
+    width: 30px;
+    height: 36px;
+  }
+  .speech {
+    font-size: 14px;
+  }
+}
+.progress progress::-webkit-progress-bar {
+  background: #e8e4dd;
+}
+.progress progress::-webkit-progress-value {
+  background: #f9a73a;
+}
+.progress progress::-moz-progress-bar {
+  background: #f9a73a;
+}

@@ -1,0 +1,511 @@
+.root {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1100px;
+  min-width: 0;
+  margin-inline: auto;
+  padding: 24px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--shadow-paper);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.heading {
+  min-width: 0;
+}
+
+.heading h2 {
+  margin: 0;
+  font-size: 21px;
+}
+
+.heading p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.navigation {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.monthPicker {
+  position: relative;
+  font-size: 15px;
+}
+
+.monthPicker > summary {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 3px;
+  list-style: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.monthPicker > summary::-webkit-details-marker {
+  display: none;
+}
+
+.monthPicker > summary:focus-visible,
+.monthPicker select:focus-visible,
+.addButton:focus-visible,
+.dayButton:focus-visible,
+.eventBar:focus-visible,
+.agendaJob:focus-visible,
+.textButton:focus-visible {
+  outline: 2px solid #8c5208;
+  outline-offset: 2px;
+}
+
+.monthPopover {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 5px);
+  right: 0;
+  display: grid;
+  min-width: 230px;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 14px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow-paper);
+}
+
+.monthPopover label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.monthPopover select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 38px;
+  padding: 6px;
+  color: var(--foreground);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.monthPopover button {
+  grid-column: 1 / -1;
+}
+
+.addButton {
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  padding: 0;
+  font-size: 25px;
+  line-height: 1;
+  background: #f9a73a;
+}
+
+.calendar {
+  min-width: 0;
+}
+
+.weekdayHeader,
+.week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.weekdayHeader {
+  padding: 8px 0;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  text-align: center;
+}
+
+.weekdayHeader span:first-child {
+  color: #b23c3c;
+}
+
+.weekdayHeader span:last-child {
+  color: var(--foreground);
+}
+
+.week {
+  min-width: 0;
+  align-items: stretch;
+  gap: 2px 1px;
+  padding: 4px 0 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.dayButton {
+  box-sizing: border-box;
+  justify-self: center;
+  width: 30px;
+  height: 30px;
+  min-width: 0;
+  padding: 0;
+  color: var(--foreground);
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.adjacentDay {
+  color: #8b9096;
+}
+
+.today {
+  color: #fff;
+  background: #8c5208;
+  font-weight: 700;
+}
+
+.selectedDay:not(.today) {
+  outline: 2px solid #985909;
+  outline-offset: 1px;
+}
+
+.eventBar {
+  position: relative;
+  box-sizing: border-box;
+  z-index: 1;
+  min-width: 0;
+  min-height: 23px;
+  align-self: stretch;
+  overflow: hidden;
+  padding: 2px 5px;
+  color: #34220d;
+  border: 0;
+  border-left: 3px solid #8c5208;
+  border-radius: 5px;
+  background: #fff1dc;
+  cursor: pointer;
+  text-align: left;
+}
+
+.eventBar:hover {
+  outline: 1px solid #985909;
+}
+
+.eventBar.ended {
+  color: #34373c;
+  border-left-color: #777d84;
+  background: #eceff1;
+}
+
+.continuesBefore {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.continuesBefore::before {
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  transform: translateY(-50%);
+  content: '‹';
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.continuesAfter {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.continuesAfter::after {
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  transform: translateY(-50%);
+  content: '›';
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.eventLabel {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.eventLabel > span {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 10px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+}
+
+.eventLabel small {
+  flex: 0 0 auto;
+  overflow: hidden;
+  color: #634a2b;
+  font-size: 9px;
+  text-overflow: ellipsis;
+}
+
+.eventBar.ended .eventLabel small {
+  color: #50565d;
+}
+
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 16px 0 22px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.summary b {
+  color: var(--foreground);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.summary small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.agenda {
+  min-width: 0;
+}
+
+.agendaHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--line);
+}
+
+.agendaHeading h3 {
+  min-width: 0;
+  margin: 0;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+
+.agendaHeading h3 small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.textButton {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 5px 8px;
+  color: var(--foreground);
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.textButton:hover {
+  background: #f5f5f4;
+}
+
+.empty {
+  margin: 12px 0;
+  padding: 18px 8px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.agendaJob {
+  display: flex;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 8px;
+  color: var(--foreground);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.agendaJob:hover {
+  background: #f7f7f7;
+}
+
+.agendaDescription {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.agendaDescription b,
+.agendaDescription > span {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.agendaDescription small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.agendaDates {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.unscheduled {
+  min-width: 0;
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.unscheduled > summary {
+  min-height: 44px;
+  padding: 12px 2px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.unscheduled > p {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 600px) {
+  .root {
+    padding: 14px 10px;
+    border-radius: 12px;
+  }
+
+  .toolbar {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .heading h2 {
+    font-size: 19px;
+  }
+
+  .heading p {
+    font-size: 11px;
+  }
+
+  .navigation {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .monthPopover {
+    right: auto;
+    left: 0;
+  }
+
+  .weekdayHeader {
+    font-size: 11px;
+  }
+
+  .week {
+    gap: 2px 0;
+    padding-block: 3px 5px;
+  }
+
+  .dayButton {
+    width: 26px;
+    height: 28px;
+    font-size: 11px;
+  }
+
+  .eventBar {
+    padding-inline: 2px;
+  }
+
+  .eventLabel {
+    justify-content: flex-start;
+  }
+
+  .eventLabel small {
+    display: none;
+  }
+
+  .continuesBefore {
+    padding-left: 8px;
+  }
+
+  .continuesAfter {
+    padding-right: 8px;
+  }
+
+  .agendaJob {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding-inline: 4px;
+  }
+
+  .agendaDates {
+    white-space: normal;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 360px) {
+  .root {
+    padding-inline: 7px;
+  }
+
+  .dayButton {
+    width: 24px;
+    height: 26px;
+  }
+
+  .eventBar {
+    min-height: 26px;
+    padding-inline: 1px;
+  }
+
+  .eventLabel > span {
+    font-size: 9px;
+  }
+
+  .agendaDescription b,
+  .agendaDescription > span {
+    font-size: 12px;
+  }
+}

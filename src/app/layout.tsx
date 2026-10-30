@@ -1,29 +1,23 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import localFont from 'next/font/local';
 import './globals.css';
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
+const pretendard = localFont({
+  src: './fonts/PretendardVariable.woff2',
+  variable: '--font-pretendard',
+  weight: '100 900',
+  display: 'swap',
 });
 
 export const metadata: Metadata = {
-  title: '바이브 코딩 시작 안내',
+  title: '꿀잡',
   description:
-    '요구사항 분석부터 DB·서버·화면 구현과 검증까지, 비개발자를 위한 개발 순서 안내',
+    '공고 일정과 경험을 관리하고 자소서·면접을 준비하는 물리치료 취업 준비 워크스페이스. 로컬 체험용입니다.',
 };
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
-    <html
-      lang="ko"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
+    <html lang="ko" className={`${pretendard.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

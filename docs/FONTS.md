@@ -6,10 +6,10 @@
 
 ## 현재 구성
 
-- `src/app/layout.tsx`는 `next/font/google`로 Geist와 Geist Mono를 불러오고 CSS 변수를 등록합니다. 설정된 subsets는 latin입니다. 이것만으로 한글 전용 글꼴이 준비되었다고 판단하지 않습니다.
-- `src/app/globals.css`는 이 변수를 Tailwind의 sans·mono에 연결하지만, body의 기본 font-family는 Arial, Helvetica, sans-serif입니다. 해당 Tailwind 글꼴 클래스를 사용하는지에 따라 실제 적용이 달라지며, 한글은 사용 가능한 대체 글꼴로 표시될 수 있습니다.
-- 따라서 현재 화면 전체가 Geist로 표시된다고 가정하지 않습니다. 실제 적용은 CSS와 브라우저에서 확인해야 합니다.
-- 외부 폰트 import가 남아 있으면 body에서 다른 글꼴을 쓰더라도 개발·빌드 시 폰트 다운로드가 필요할 수 있습니다.
+- `src/app/layout.tsx`는 `next/font/local`로 Pretendard Variable v1.3.9를 불러옵니다. 기본 본문·제목·입력창에 `--font-pretendard`를 적용하며 굵기 100–900을 지원합니다.
+- 원본 파일은 `src/app/fonts/PretendardVariable.woff2`에 포함되어 있습니다. 한국어용 공식 배포 파일이며 용량은 약 2MB입니다.
+- [공식 v1.3.9 배포](https://github.com/orioncactus/pretendard/tree/v1.3.9)의 SIL OFL 1.1 저작권·라이선스를 `src/app/fonts/OFL.txt`에 보존합니다. 폰트 자체를 단독 판매할 수 없으며 수정 시 예약된 글꼴 이름 조건을 확인해야 합니다.
+- 기존 Geist 원격 import는 제거했습니다. 개발·빌드 시 폰트 다운로드가 필요 없고, 방문자는 앱에서 폰트를 받습니다. 로딩 중에는 시스템 대체 글꼴을 표시합니다.
 
 ## 처음에는 무엇을 선택하나요?
 
